@@ -2,5 +2,12 @@
 <resources>
     <style name="Theme.App" parent="android:Theme.Material">
         <item name="android:colorPrimary">@color/primary</item>
+        <item name="android:windowBackground">@color/bluff_background</item>
+        <item name="android:statusBarColor">@color/bluff_background</item>
+        <item name="android:navigationBarColor">@color/bluff_background</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>

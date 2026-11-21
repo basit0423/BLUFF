@@ -12,6 +12,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.AlphaAnimation;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -38,6 +39,7 @@ public class MainActivity extends Activity {
     private FrameLayout root;
     private LinearLayout pageBody;
     private SharedPreferences prefs;
+    private ProfileStore profileStore;
     private int unlockedLevel = 1, currentLevel = 1, questionIndex = 0;
     private int score = 0, correct = 0, combo = 0, bestCombo = 0;
     private int quizMode = 0; // 0 Truth Hunt, 1 Bluff Battle
@@ -100,6 +102,7 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
         prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        profileStore = new ProfileStore(this);
         unlockedLevel = Math.max(1, Math.min(TOTAL_LEVELS, prefs.getInt("unlocked", 1)));
         soundOn = prefs.getBoolean("sound", true);
         vibrationOn = prefs.getBoolean("vibration", true);
@@ -128,7 +131,7 @@ public class MainActivity extends Activity {
         if (timer != null) { timer.cancel(); timer = null; }
         root.removeAllViews();
         ScrollView scroll = new ScrollView(this); scroll.setFillViewport(true); scroll.setClipToPadding(false);
-        pageBody = column(); pad(pageBody,20,18,20,28); scroll.addView(pageBody);
+        pageBody = column(); pad(pageBody,20,18,20,92); scroll.addView(pageBody);
         root.addView(scroll, new FrameLayout.LayoutParams(-1,-1));
         TextView top = text("BLUFF!  ·  " + title.toUpperCase(Locale.US), 13, GREEN, true);
         pageBody.addView(top, lp(-1,28));
@@ -163,20 +166,156 @@ public class MainActivity extends Activity {
     }
     private int worldFor(int level) { return (level-1)/50+1; }
     private void showHome() {
-        basePage("Think fast. Bluff smart.","A party quiz where quick thinking wins.");
-        TextView logo=text("BLUFF!",42,GREEN,true); logo.setGravity(Gravity.CENTER); pageBody.addView(logo,lp(-1,68));
-        TextView tagline=text("THINK FAST. BLUFF SMART.",12,GOLD,true); tagline.setGravity(Gravity.CENTER); pageBody.addView(tagline,lp(-1,26));
-        space(pageBody,20);
-        LinearLayout progress=card("YOUR JOURNEY","World "+worldFor(unlockedLevel)+"  ·  Level "+unlockedLevel+" of 400  ·  "+stageName(unlockedLevel));
-        TextView p=text("✦  "+(unlockedLevel-1)+" levels completed",13,GREEN,true); progress.addView(p,lp(-1,28));
-        addButton("CONTINUE  →",true,v->{ currentLevel=unlockedLevel; startQuiz(0); });
-        addButton("LEVEL MAP",false,v->showLevelMap(1));
-        addButton("TRUTH HUNT",false,v->startQuiz(0));
-        addButton("BLUFF BATTLE",false,v->startQuiz(1));
-        addButton("IMPOSTOR PARTY",false,v->showImpostorSetup());
-        addButton("SETTINGS",false,v->showSettings());
-        addButton("ACCOUNT & ONLINE",false,v->showAccount());
-        TextView foot=text("LOCAL PROGRESS SAVED ON THIS DEVICE",10,MUTED,false); foot.setGravity(Gravity.CENTER); pageBody.addView(foot,lp(-1,30));
+        basePage("Think fast. Bluff smart.","");
+        PlayerProfile profile = profileStore.load(unlockedLevel);
+
+        LinearLayout header = row();
+        TextView avatar = text("  " + profile.getAvatarId() + "  ", 18, BG, true);
+        avatar.setGravity(Gravity.CENTER);
+        avatar.setBackground(shape(GOLD, 28, GOLD, 2));
+        avatar.setElevation(dp(6));
+        header.addView(avatar, lp(56,56));
+        LinearLayout identity = column();
+        identity.setPadding(dp(12),0,0,0);
+        TextView name = text(profile.getDisplayName(), 16, WHITE, true);
+        identity.addView(name, lp(-1,-2));
+        TextView level = text("LEVEL " + profile.getLevel() + "  •  " + profile.getCoins() + " COINS", 11, GOLD, true);
+        identity.addView(level, lp(-1,-2));
+        header.addView(identity, new LinearLayout.LayoutParams(0,dp(56),1));
+        TextView notification = text("•", 18, GOLD, true);
+        notification.setGravity(Gravity.CENTER);
+        notification.setBackground(shape(CARD2,22,GOLD,1));
+        notification.setOnClickListener(v -> Toast.makeText(this,"You're all caught up.",Toast.LENGTH_SHORT).show());
+        header.addView(notification, lp(44,44));
+        TextView settings = text("⚙", 18, WHITE, true);
+        settings.setGravity(Gravity.CENTER);
+        settings.setBackground(shape(CARD2,22,Color.rgb(55,85,72),1));
+        settings.setOnClickListener(v -> showSettings());
+        header.addView(settings, lp(44,44));
+        pageBody.addView(header, lp(-1,56));
+        space(pageBody,10);
+
+        LinearLayout xpCard = column();
+        pad(xpCard,14,11,14,11);
+        xpCard.setBackground(shape(CARD,18,Color.rgb(43,78,65),1));
+        xpCard.setElevation(dp(3));
+        TextView xpLabel = text("XP  " + profile.getXp() + " / " + profile.getXpToNextLevel(),11,GREEN,true);
+        xpCard.addView(xpLabel,lp(-1,-2));
+        LinearLayout xpBar=row();
+        View xpFill = new View(this);
+        xpFill.setBackground(shape(GREEN,6,GREEN,0));
+        int filled=Math.max(0,Math.min(profile.getXp(),profile.getXpToNextLevel()));
+        xpBar.addView(xpFill,new LinearLayout.LayoutParams(0,dp(7),filled));
+        View xpTrack = new View(this);
+        xpTrack.setBackground(shape(CARD2,6,CARD2,0));
+        xpBar.addView(xpTrack,new LinearLayout.LayoutParams(0,dp(7),
+                profile.getXpToNextLevel()-filled));
+        xpCard.addView(xpBar,lp(-1,7));
+        pageBody.addView(xpCard,lp(-1,-2));
+        space(pageBody,18);
+
+        TextView logo=text("BLUFF!",44,GREEN,true); logo.setGravity(Gravity.CENTER); pageBody.addView(logo,lp(-1,62));
+        TextView tagline=text("THINK FAST. BLUFF SMART.",12,GOLD,true); tagline.setGravity(Gravity.CENTER); pageBody.addView(tagline,lp(-1,24));
+        space(pageBody,16);
+
+        Button play=button("PLAY  •  CONTINUE JOURNEY",true,v->{ currentLevel=unlockedLevel; startQuiz(0); });
+        play.setTextSize(16); play.setElevation(dp(8));
+        pageBody.addView(play,lp(-1,66)); space(pageBody,14);
+
+        TextView section=text("CHOOSE YOUR GAME",11,GOLD,true); pageBody.addView(section,lp(-1,24));
+        pageBody.addView(modeGrid(),lp(-1,-2)); space(pageBody,11);
+
+        LinearLayout journey=card("CONTINUE JOURNEY","World "+worldFor(unlockedLevel)+"  •  Level "+unlockedLevel+"  •  "+stageName(unlockedLevel));
+        journey.setOnClickListener(v->{ currentLevel=unlockedLevel; startQuiz(0); });
+        LinearLayout featured=card("DAILY CHALLENGE","Complete today’s set and protect your streak.");
+        featured.setOnClickListener(v -> startQuiz(0));
+        TextView foot=text("OFFLINE PROGRESS  •  LOCAL DEVICE",9,MUTED,true); foot.setGravity(Gravity.CENTER); pageBody.addView(foot,lp(-1,32));
+        addBottomNavigation("HOME");
+    }
+
+    private LinearLayout modeGrid() {
+        LinearLayout grid = column();
+        LinearLayout top = row();
+        top.addView(modeCard("TRUTH HUNT","Quick answers",GREEN,v -> startQuiz(0)),
+                new LinearLayout.LayoutParams(0,dp(92),1));
+        top.addView(modeCard("BLUFF BATTLE","Score vs. combo",GOLD,v -> startQuiz(1)),
+                new LinearLayout.LayoutParams(0,dp(92),1));
+        grid.addView(top);
+        LinearLayout bottom = row();
+        bottom.addView(modeCard("IMPOSTOR","Pass the phone",GREEN,v -> showImpostorSetup()),
+                new LinearLayout.LayoutParams(0,dp(92),1));
+        bottom.addView(modeCard("QUICK QUIZ","Fast 5-rounds",GOLD,v -> startQuiz(0)),
+                new LinearLayout.LayoutParams(0,dp(92),1));
+        grid.addView(bottom);
+        return grid;
+    }
+
+    private LinearLayout modeCard(String title, String subtitle, int accent,
+                                  View.OnClickListener click) {
+        LinearLayout card = column();
+        pad(card,14,12,14,12);
+        card.setBackground(shape(CARD,18,Color.rgb(43,78,65),1));
+        card.setElevation(dp(4));
+        card.setOnClickListener(click);
+        TextView titleView = text(title,13,accent,true);
+        titleView.setGravity(Gravity.CENTER);
+        card.addView(titleView,lp(-1,24));
+        TextView subView = text(subtitle,11,MUTED,false);
+        subView.setGravity(Gravity.CENTER);
+        card.addView(subView,lp(-1,-2));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0,dp(92),1);
+        params.setMargins(dp(4),dp(4),dp(4),dp(4));
+        card.setLayoutParams(params);
+        return card;
+    }
+
+    private void addBottomNavigation(String selected) {
+        LinearLayout nav=row();
+        nav.setBackground(shape(Color.rgb(11,27,23),0,Color.rgb(35,65,54),1));
+        nav.setElevation(dp(16));
+        nav.setGravity(Gravity.CENTER);
+        pad(nav,4,7,4,7);
+        addNavItem(nav,"HOME","HOME",selected);
+        addNavItem(nav,"MAP","LEVELS",selected);
+        addNavItem(nav,"PLAY","PLAY",selected);
+        addNavItem(nav,"SOCIAL","SOCIAL",selected);
+        addNavItem(nav,"PROFILE","PROFILE",selected);
+        FrameLayout.LayoutParams params=new FrameLayout.LayoutParams(-1,dp(68));
+        params.gravity=Gravity.BOTTOM;
+        root.addView(nav,params);
+    }
+
+    private void addNavItem(LinearLayout nav, String label, String key, String selected) {
+        TextView item=text(label,9,key.equals(selected)?GOLD:MUTED,true);
+        item.setGravity(Gravity.CENTER);
+        item.setMinHeight(dp(54));
+        item.setOnClickListener(v -> {
+            if("HOME".equals(key)) showHome();
+            else if("LEVELS".equals(key)) showLevelMap(worldFor(unlockedLevel));
+            else if("PLAY".equals(key)) showPlayMenu();
+            else if("SOCIAL".equals(key)) showSocial();
+            else showProfile();
+        });
+        nav.addView(item,new LinearLayout.LayoutParams(0,dp(54),1));
+    }
+
+    private void showPlayMenu() {
+        basePage("Play","Choose a quiz experience.");
+        heading("GAME MODES");
+        pageBody.addView(modeGrid(),lp(-1,-2));
+        space(pageBody,12);
+        addButton("SURVIVAL CHALLENGE",false,v -> startQuiz(0));
+        addButton("DAILY CHALLENGE",false,v -> startQuiz(0));
+        addBottomNavigation("PLAY");
+    }
+
+    private void showSocial() {
+        basePage("Social","Friends, rankings and challenges.");
+        card("FRIENDS","Sign in to search players and send friend requests.");
+        card("GLOBAL LEADERBOARD","Available after Firebase account and score validation are configured.");
+        card("FRIEND CHALLENGES","Create challenges and compare results with friends.");
+        addButton("ACCOUNT & ONLINE",true,v -> showAccount());
+        addBottomNavigation("SOCIAL");
     }
     private void showLevelMap(int world) {
         final int safeWorld=Math.max(1,Math.min(8,world));
@@ -201,6 +340,7 @@ public class MainActivity extends Activity {
         }
         space(pageBody,12);
         addButton("BACK TO HOME",false,v->showHome());
+        addBottomNavigation("LEVELS");
     }
     private ArrayList<Question> questionsForLevel(int level) {
         ArrayList<Question> pool=new ArrayList<>(); String target=stageDifficulty(level);
@@ -248,6 +388,20 @@ public class MainActivity extends Activity {
             public void onFinish(){timer=null; if(timerText!=null){combo=0;showAnswer(false,"Time is up!");}}
         }.start();
     }
+    @Override protected void onPause() {
+        super.onPause();
+        if(timer!=null){
+            timer.cancel();
+            timer=null;
+        }
+    }
+    @Override protected void onDestroy() {
+        super.onDestroy();
+        if(timer!=null){
+            timer.cancel();
+            timer=null;
+        }
+    }
     private void answer(String chosen, Question q) {
         if(timer==null)return; timer.cancel(); timer=null;
         boolean right=chosen.equals(q.answer); if(right){correct++;combo++;bestCombo=Math.max(bestCombo,combo);score+=100+(int)(timeLeft/1000)*5+Math.min(combo,5)*10;}else combo=0;
@@ -275,12 +429,108 @@ public class MainActivity extends Activity {
         addButton("LEVEL MAP",false,v->showLevelMap(worldFor(currentLevel)));
         addButton("HOME",false,v->showHome());
     }
+    private void showProfile() {
+        basePage("Profile","Customize your player identity.");
+        PlayerProfile profile = profileStore.load(unlockedLevel);
+
+        LinearLayout identity = row();
+        TextView avatar = text("  " + profile.getAvatarId() + "  ", 24, BG, true);
+        avatar.setGravity(Gravity.CENTER);
+        avatar.setBackground(shape(GOLD,34,GOLD,2));
+        avatar.setElevation(dp(8));
+        identity.addView(avatar,lp(68,68));
+        LinearLayout details=column();
+        pad(details,12,0,0,0);
+        TextView name=text(profile.getDisplayName(),20,WHITE,true);
+        details.addView(name,lp(-1,-2));
+        TextView id=text(profile.getPlayerId()+"  •  LEVEL "+profile.getLevel(),10,GOLD,true);
+        details.addView(id,lp(-1,-2));
+        identity.addView(details,new LinearLayout.LayoutParams(0,dp(68),1));
+        pageBody.addView(identity,lp(-1,68)); space(pageBody,16);
+
+        LinearLayout stats=row();
+        stats.addView(profileStat("XP",String.valueOf(profile.getXp())));
+        stats.addView(profileStat("COINS",String.valueOf(profile.getCoins())));
+        stats.addView(profileStat("ACCURACY",profile.getAccuracyPercent()+"%"));
+        pageBody.addView(stats,lp(-1,72));
+        space(pageBody,10);
+        pageBody.addView(profileStatWide("GAMES",String.valueOf(profile.getGamesPlayed()),
+                "QUESTIONS",String.valueOf(profile.getQuestionsAnswered()),
+                "BEST STREAK",String.valueOf(profile.getBestStreak())));
+        space(pageBody,12);
+
+        card("AVATAR ITEMS","Choose an original BLUFF! identity.");
+        LinearLayout avatars=row();
+        for(int avatarId=1;avatarId<=3;avatarId++){
+            final int selectedId=avatarId;
+            TextView choice=text("  "+avatarId+"  ",18,avatarId==profile.getAvatarId()?BG:WHITE,true);
+            choice.setGravity(Gravity.CENTER);
+            choice.setBackground(shape(avatarId==profile.getAvatarId()?GOLD:CARD2,26,
+                    avatarId==profile.getAvatarId()?GOLD:Color.rgb(55,85,72),1));
+            choice.setOnClickListener(v->{profileStore.setAvatarId(selectedId);showProfile();});
+            LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(0,dp(52),1);
+            params.setMargins(dp(5),0,dp(5),0);
+            choice.setLayoutParams(params);
+            avatars.addView(choice);
+        }
+        pageBody.addView(avatars,lp(-1,52)); space(pageBody,12);
+        addButton("EDIT DISPLAY NAME",true,v -> editDisplayName(profile.getDisplayName()));
+        addBottomNavigation("PROFILE");
+    }
+
+    private LinearLayout profileStat(String label, String value) {
+        LinearLayout stat=column();
+        pad(stat,8,10,8,10);
+        stat.setBackground(shape(CARD,16,Color.rgb(43,78,65),1));
+        TextView valueView=text(value,17,GOLD,true); valueView.setGravity(Gravity.CENTER);
+        stat.addView(valueView,lp(-1,24));
+        TextView labelView=text(label,9,MUTED,true); labelView.setGravity(Gravity.CENTER);
+        stat.addView(labelView,lp(-1,18));
+        LinearLayout.LayoutParams params=new LinearLayout.LayoutParams(0,dp(72),1);
+        params.setMargins(dp(4),0,dp(4),0);
+        stat.setLayoutParams(params);
+        return stat;
+    }
+
+    private LinearLayout profileStatWide(String label1,String value1,String label2,String value2,
+                                         String label3,String value3) {
+        LinearLayout stats=row();
+        stats.addView(profileStat(label1,value1));
+        stats.addView(profileStat(label2,value2));
+        stats.addView(profileStat(label3,value3));
+        return stats;
+    }
+
+    private void editDisplayName(String currentName) {
+        EditText input=new EditText(this);
+        input.setText(currentName);
+        input.setSingleLine(true);
+        input.setMaxLines(1);
+        input.setTextSize(16);
+        input.setTextColor(WHITE);
+        input.setHintTextColor(MUTED);
+        input.setHint("Display name");
+        new AlertDialog.Builder(this)
+                .setTitle("Edit display name")
+                .setView(input)
+                .setNegativeButton("CANCEL",(dialog,which)->{})
+                .setPositiveButton("SAVE",(dialog,which)->{
+                    String name=input.getText().toString().trim();
+                    if(name.length()<2 || name.length()>20){
+                        Toast.makeText(this,"Use 2 to 20 characters.",Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    profileStore.setDisplayName(name);
+                    showProfile();
+                }).show();
+    }
     private void showSettings() {
         basePage("Settings","Make BLUFF! feel right for your game night.");
         addButton("SOUND: "+(soundOn?"ON":"OFF"),false,v->{soundOn=!soundOn;prefs.edit().putBoolean("sound",soundOn).apply();showSettings();});
         addButton("VIBRATION: "+(vibrationOn?"ON":"OFF"),false,v->{vibrationOn=!vibrationOn;prefs.edit().putBoolean("vibration",vibrationOn).apply();showSettings();});
         card("PROGRESS","Your unlocked level is saved on this device. Clearing app data may erase local progress.");
         addButton("RESET LOCAL PROGRESS",false,v->new AlertDialog.Builder(this).setTitle("Reset progress?").setMessage("This resets your unlocked level to 1 on this device.").setNegativeButton("CANCEL",(d,w)->{}).setPositiveButton("RESET",(d,w)->{unlockedLevel=1;prefs.edit().putInt("unlocked",1).apply();showSettings();}).show());
+        addButton("PROFILE",false,v -> showProfile());
         addButton("BACK",true,v->showHome());
     }
     private void showAccount() {
@@ -291,6 +541,7 @@ public class MainActivity extends Activity {
         addButton("FACEBOOK SIGN-IN",false,v->authNotice("Facebook"));
         card("ONLINE FEATURES","Google/Facebook sign-in, cloud saves, online profiles and leaderboards are not active yet. They require Firebase Authentication setup, provider credentials, app configuration and a backend. These buttons do not sign you in yet.");
         addButton("BACK",false,v->showHome());
+        addBottomNavigation("PROFILE");
     }
     private void authNotice(String provider) {
         new AlertDialog.Builder(this).setTitle(provider+" sign-in not configured")
